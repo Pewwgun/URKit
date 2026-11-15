@@ -80,31 +80,48 @@ void BrowseForMods(SelectionWindow *state) {
         const COMDLG_FILTERSPEC filters[] = {{L"URKit mod DLLs", L"*.dll"}, {L"All files", L"*.*"}};
         dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
         dialog->SetTitle(L"Select URKit mod DLL");
-        dialog->SetOptions(FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+        dialog->SetOptions(FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST | FOS_ALLOWMULTISELECT);
         dialog->SetDefaultExtension(L"dll");
         result = dialog->Show(state->window);
     }
 
-    PWSTR selectedPath = nullptr;
+    std::vector<std::wstring> selectedPaths;
     if (SUCCEEDED(result)) {
-        IShellItem *item = nullptr;
-        result = dialog->GetResult(&item);
+        IShellItemArray *items = nullptr;
+        result = dialog->GetResults(&items);
         if (SUCCEEDED(result)) {
-            result = item->GetDisplayName(SIGDN_FILESYSPATH, &selectedPath);
-            item->Release();
+            DWORD count = 0;
+            result = items->GetCount(&count);
+            for (DWORD index = 0; SUCCEEDED(result) && index < count; ++index) {
+                IShellItem *item = nullptr;
+                if (FAILED(items->GetItemAt(index, &item)))
+                    continue;
+                PWSTR itemPath = nullptr;
+                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &itemPath)) && itemPath && itemPath[0]) {
+                    selectedPaths.emplace_back(itemPath);
+                    CoTaskMemFree(itemPath);
+                }
+                item->Release();
+            }
+            items->Release();
         }
     }
 
-    if (SUCCEEDED(result) && selectedPath && selectedPath[0]) {
-        state->modPaths = {selectedPath};
-        SetControlText(state->modsEdit, selectedPath);
+    if (SUCCEEDED(result) && !selectedPaths.empty()) {
+        state->modPaths = selectedPaths;
+
+        std::wstring display;
+        for (const std::wstring &path : selectedPaths) {
+            if (!display.empty())
+                display += L"; ";
+            display += path;
+        }
+        SetControlText(state->modsEdit, display);
     } else if (result != HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
         MessageBoxW(state->window, L"Could not open the mod DLL file picker.", L"URKit",
                     MB_OK | MB_ICONERROR);
     }
 
-    if (selectedPath)
-        CoTaskMemFree(selectedPath);
     if (dialog)
         dialog->Release();
     if (uninitialize)
