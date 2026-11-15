@@ -89,6 +89,10 @@
         void *it = nullptr;
         const void *match = nullptr;
         int matches = 0;
+        // IL2CPP returns an empty method list for a class whose metadata has not been
+        // initialized yet, which makes inherited methods (e.g. UnityEngine.Object.GetInstanceID)
+        // look absent and yields "same-arity candidates=0". Force init before enumerating.
+        URK::il2cpp::runtime_class_init(current);
         while (const auto *m = URK::il2cpp::class_get_methods(static_cast<const URK::il2cpp::Class *>(current), &it)) {
             const char *mn = URK::il2cpp::method_get_name(m);
             if (!mn || n != mn || URK::il2cpp::method_get_param_count(m) != parameterTypeNames.size())

@@ -201,6 +201,9 @@ void DumpProperties(TypeRef type, DiagnosticSink sink = nullptr);
         const void *nonGeneric = nullptr;
         int matches = 0;
         int nonGenericMatches = 0;
+        // See backend_codegen.inl: an un-initialized IL2CPP class enumerates no methods,
+        // hiding inherited members. Force init before walking its method list.
+        URK::il2cpp::runtime_class_init(current);
         while (const auto *m = URK::il2cpp::class_get_methods(static_cast<const URK::il2cpp::Class *>(current), &it)) {
             const char *mn = URK::il2cpp::method_get_name(m);
             if (!mn || n != mn)
